@@ -190,7 +190,6 @@ namespace TarkovMonitor
                     }
                     if (eventLine.Contains("application|Matching with group id"))
                     {
-                        TakePlayerScreenshot();
                         MapLoading?.Invoke(this, new());
                     }
                     if (eventLine.Contains("application|LocationLoaded"))
@@ -302,11 +301,15 @@ namespace TarkovMonitor
             }
         }
 
-        private void TakePlayerScreenshot()
+        public string? TakePlayerScreenshot()
         {
-            if (process == null) return;
+            if (process == null)
+            {
+                Debug.WriteLine("Process is null");
+                return null;
+            }
             IntPtr hWnd = process.MainWindowHandle;
-            printScreenHandler.SaveScreenshot(hWnd, screenshotPath);
+            return printScreenHandler.SaveScreenshot(hWnd, screenshotPath);
         }
 
         private void ProcessTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)

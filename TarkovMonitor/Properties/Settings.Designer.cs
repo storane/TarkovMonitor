@@ -12,7 +12,7 @@ namespace TarkovMonitor.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.6.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.8.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -82,22 +82,19 @@ namespace TarkovMonitor.Properties {
                 this["restartTaskAlert"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool minimizeAtStartup
-        {
-            get
-            {
+        public bool minimizeAtStartup {
+            get {
                 return ((bool)(this["minimizeAtStartup"]));
             }
-            set
-            {
+            set {
                 this["minimizeAtStartup"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
@@ -131,6 +128,30 @@ namespace TarkovMonitor.Properties {
             }
             set {
                 this["autoNavigateMap"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool takePlayerScreenshot {
+            get {
+                return ((bool)(this["takePlayerScreenshot"]));
+            }
+            set {
+                this["takePlayerScreenshot"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        public int monitorIndex {
+            get {
+                return ((int)(this["monitorIndex"]));
+            }
+            set {
+                this["monitorIndex"] = value;
             }
         }
     }

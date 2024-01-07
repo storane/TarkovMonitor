@@ -37,12 +37,29 @@ namespace TarkovMonitor
             }
         }
 
-        public void SaveScreenshot(IntPtr hWnd, string screenshotPath)
+        public string? SaveScreenshot(IntPtr hWnd, string screenshotPath)
         {
-            if (hWnd == IntPtr.Zero) return;
+            if (hWnd == IntPtr.Zero)
+            {
+                Debug.WriteLine("Unable to capture screenshot", hWnd);
+                return null;
+            }
             SetForegroundWindow(hWnd);
 
-            var bounds = Screen.AllScreens[screenIndex].Bounds;
+            var index = screenIndex;
+            if (Properties.Settings.Default.monitorIndex != -1)
+            {
+                index = Properties.Settings.Default.monitorIndex;
+                Debug.WriteLine("Saved index = ", index);
+            }
+
+            var screen = Screen.AllScreens.ElementAtOrDefault(index);
+            if (screen == null)
+            {
+                Debug.WriteLine("Screen index out of bounds", index);
+                return null;
+            }
+            var bounds = screen.Bounds;
 
             var position = new Vector2(bounds.X, bounds.Y);
             using var bitmap = new Bitmap(bounds.Size.Width, bounds.Size.Height, PixelFormat.Format24bppRgb);
@@ -54,9 +71,13 @@ namespace TarkovMonitor
             catch (Exception e)
             {
                 Debug.WriteLine("Unable to capture screenshot", e);
+                return null;
             }
-            var imgName = DateTime.Now.ToString("yyyy-MM-dd[HH-mm-ss]");
-            bitmap.Save(screenshotPath + Path.DirectorySeparatorChar + imgName + ".jpeg");
+            var imgName = DateTime.Now.ToString("yyyy-MM-dd[HH-mm-ss]") + ".jpeg";
+            var fullPath = Path.Combine(screenshotPath, imgName);
+            bitmap.Save(fullPath);
+
+            return fullPath;
         }
     }
 }
