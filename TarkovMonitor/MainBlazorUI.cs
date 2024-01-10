@@ -137,17 +137,6 @@ namespace TarkovMonitor
 
         private void Eft_MapLoading(object? sender, EventArgs e)
         {
-            if (Properties.Settings.Default.takePlayerScreenshot)
-            {
-                var path = eft.TakePlayerScreenshot();
-                if (path != null)
-                {
-                    messageLog.AddMessage($"Screenshot saved to: {path}");
-                } else
-                {
-                    messageLog.AddMessage("Failed to take screenshot");
-                }
-            }
             if (TarkovTracker.Progress == null)
             {
                 return;
@@ -299,6 +288,18 @@ namespace TarkovMonitor
 
         private void Eft_MatchFound(object? sender, MatchFoundEventArgs e)
         {
+            if (Properties.Settings.Default.takePlayerScreenshot)
+            {
+                var path = eft.TakePlayerScreenshot();
+                if (path != null)
+                {
+                    messageLog.AddMessage($"Screenshot saved to: {path}");
+                }
+                else
+                {
+                    messageLog.AddMessage("Failed to take screenshot");
+                }
+            }
             if (Properties.Settings.Default.matchFoundAlert)
             {
                 PlaySoundFromResource(Properties.Resources.match_found);
