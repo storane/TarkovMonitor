@@ -4,6 +4,7 @@
 @inject GameWatcher eft
 @inject MessageLog messageLog
 @inject IDialogService DialogService
+@inject FolderPicker folderPicker
 @layout AppLayout
 @implements IDisposable
 
@@ -39,7 +40,12 @@
             <div>
                 <MudSwitch @bind-Checked="@TakeScreenshotSwitch" Label="Record screenshot of the player at the beginning of every raid" Color="Color.Info" />
                 <MudText Typo="Typo.body1" Class="d-flex align-center mt-2">Overwrite monitor index if value from Tarkov settings is incorrect.</MudText>
-                <MudTextField @bind-Value="@ScreenshotMonitorIndex" Label="Monitor Index" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"></MudTextField>
+                <MudNumericField @bind-Value="@ScreenshotMonitorIndex" Label="Monitor Index" Variant="Variant.Outlined" Margin="Margin.Dense"></MudNumericField>
+                <MudText Typo="Typo.body1" Class="d-flex align-center mt-2">Where the auto screenshots will be saved.</MudText>
+                <div class="d-flex gap-1 align-center">
+                    <MudTextField @bind-Value="@AutoScreenshotDirectory" Label="Save to" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
+                    <MudIconButton style="height:fit-content" Icon="@Icons.Material.Filled.FolderOpen" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Medium" @onclick="OpenFolderDialog" />
+                </div>
             </div>
         </MudPaper>
     </MudItem>
@@ -199,6 +205,29 @@
             {
                 Properties.Settings.Default.monitorIndex = -1;
             }
+            Properties.Settings.Default.Save();
+        }
+    }
+
+    public string AutoScreenshotDirectory
+    {
+        get
+        {
+            return Properties.Settings.Default.autoScreenshotDir;
+        }
+        set
+        {
+            Properties.Settings.Default.autoScreenshotDir = value;
+            Properties.Settings.Default.Save();            
+        }
+    }
+
+    public void OpenFolderDialog()
+    {
+        var folder = folderPicker.DisplayFolderPicker();
+        if (!string.IsNullOrEmpty(folder))
+        {
+            Properties.Settings.Default.autoScreenshotDir = folder;
             Properties.Settings.Default.Save();
         }
     }

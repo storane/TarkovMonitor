@@ -154,5 +154,17 @@ namespace TarkovMonitor.Properties {
                 this["monitorIndex"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string autoScreenshotDir {
+            get {
+                return ((string)(this["autoScreenshotDir"]));
+            }
+            set {
+                this["autoScreenshotDir"] = value;
+            }
+        }
     }
 }

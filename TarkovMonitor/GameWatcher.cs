@@ -66,6 +66,11 @@ namespace TarkovMonitor
             SetupScreenshotWatcher();
         }
 
+        public string GetScreenshotPath()
+        {
+            return screenshotPath;
+        }
+
         public void SetupScreenshotWatcher()
         {
             try
