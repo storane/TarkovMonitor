@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Text;
+using System.Globalization;
 
 namespace TarkovMonitor
 {
@@ -23,15 +24,17 @@ namespace TarkovMonitor
         public event EventHandler GameStarted;
         public event EventHandler<GroupInviteSendEventArgs> GroupInviteSend;
         public event EventHandler<GroupInviteAcceptEventArgs> GroupInviteAccept;
-        public event EventHandler<GroupReadyEventArgs> GroupReady;
+        public event EventHandler<GroupRaidSettingsEventArgs> GroupRaidSettings;
+        public event EventHandler<GroupMemberReadyEventArgs> GroupMemberReady;
         public event EventHandler GroupDisbanded;
         public event EventHandler<GroupUserLeaveEventArgs> GroupUserLeave;
         public event EventHandler MapLoading;
-        public event EventHandler<MatchingStartedEventArgs> MatchingStarted;
-        public event EventHandler<MatchFoundEventArgs> MatchFound; // only fires on initial load into a raid
-        public event EventHandler<MatchFoundEventArgs> MapLoaded; // fires on initial and subsequent loads into a raid
-        public event EventHandler<MatchingCancelledEventArgs> MatchingAborted;
-        public event EventHandler<RaidLoadedEventArgs> RaidLoaded;
+        public event EventHandler<RaidInfoEventArgs> MatchingStarted;
+        public event EventHandler<RaidInfoEventArgs> MatchFound; // only fires on initial load into a raid
+        public event EventHandler<RaidInfoEventArgs> MapLoaded; // fires on initial and subsequent loads into a raid
+        public event EventHandler<RaidInfoEventArgs> MatchingAborted;
+        public event EventHandler<RaidInfoEventArgs> RaidCountdown;
+        public event EventHandler<RaidInfoEventArgs> RaidStarted;
         public event EventHandler<RaidExitedEventArgs> RaidExited;
         public event EventHandler<TaskModifiedEventArgs> TaskModified;
         public event EventHandler<TaskEventArgs> TaskStarted;
@@ -99,21 +102,27 @@ namespace TarkovMonitor
         }
         private void ScreenshotWatcher_Created(object sender, FileSystemEventArgs e)
         {
-            var match = Regex.Match(e.Name, @"\d{4}-\d{2}-\d{2}\[\d{2}-\d{2}\]_(?<position>.+) \(\d\)\.png");
-            if (!match.Success)
+            try
             {
-                return;
-            }
-            var position = Regex.Match(match.Groups["position"].Value, @"(?<x>-?[\d.]+), (?<y>-?[\d.]+), (?<z>-?[\d.]+)_.*");
-            if (!position.Success)
+                var match = Regex.Match(e.Name, @"\d{4}-\d{2}-\d{2}\[\d{2}-\d{2}\]_(?<position>.+) \(\d\)\.png");
+                if (!match.Success)
+                {
+                    return;
+                }
+                var position = Regex.Match(match.Groups["position"].Value, @"(?<x>-?[\d.]+), (?<y>-?[\d.]+), (?<z>-?[\d.]+)_.*");
+                if (!position.Success)
+                {
+                    return;
+                }
+                if (lastKnownMap == null)
+                {
+                    return;
+                }
+                PlayerPosition?.Invoke(this, new(lastKnownMap, new Position(position.Groups["x"].Value, position.Groups["y"].Value, position.Groups["z"].Value)));
+            } catch (Exception ex)
             {
-                return;
+                ExceptionThrown?.Invoke(this, new ExceptionEventArgs(ex, $"parsing screenshot {e.Name}"));
             }
-            if (lastKnownMap == null)
-            {
-                //return;
-            }
-            PlayerPosition?.Invoke(this, new(lastKnownMap, new Position(position.Groups["x"].Value, position.Groups["y"].Value, position.Groups["z"].Value)));
         }
 
         public void Start()
@@ -183,10 +192,15 @@ namespace TarkovMonitor
                         // When the group is disbanded
                         GroupDisbanded?.Invoke(this, new());
                     }
-					if (eventLine.Contains("Got notification | GroupMatchRaidReady"))
+                    if (eventLine.Contains("Got notification | GroupMatchRaidSettings"))
+                    {
+                        // Occurs when group leader invites members to be ready
+                        GroupRaidSettings?.Invoke(this, new GroupRaidSettingsEventArgs(jsonNode));
+                    }
+                    if (eventLine.Contains("Got notification | GroupMatchRaidReady"))
                     {
                         // Occurs for each other member of the group when ready
-                        GroupReady?.Invoke(this, new GroupReadyEventArgs(jsonNode));
+                        GroupMemberReady?.Invoke(this, new GroupMemberReadyEventArgs(jsonNode));
                     }
                     if (eventLine.Contains("application|Matching with group id"))
                     {
@@ -197,7 +211,7 @@ namespace TarkovMonitor
 						// The map has been loaded and the game is searching for a match
 						raidInfo = new()
 						{
-							MapLoadTime = float.Parse(Regex.Match(eventLine, @"LocationLoaded:[0-9.]+ real:(?<loadTime>[0-9.]+)").Groups["loadTime"].Value)
+							MapLoadTime = float.Parse(Regex.Match(eventLine, @"LocationLoaded:[0-9.,]+ real:(?<loadTime>[0-9.,]+)").Groups["loadTime"].Value.Replace(",", "."), CultureInfo.InvariantCulture)
 						};
 						MatchingStarted?.Invoke(this, new(raidInfo));
 					}
@@ -207,8 +221,8 @@ namespace TarkovMonitor
 						// Just the queue time is available so far
 						// Occurs on initial raid load and when the user cancels matching
                         // Does not occur when the user re-connects to a raid in progress
-						var queueTimeMatch = Regex.Match(eventLine, @"MatchingCompleted:[0-9.]+ real:(?<queueTime>[0-9.]+)");
-						raidInfo.QueueTime = float.Parse(queueTimeMatch.Groups["queueTime"].Value);
+						var queueTimeMatch = Regex.Match(eventLine, @"MatchingCompleted:[0-9.,]+ real:(?<queueTime>[0-9.,]+)");
+						raidInfo.QueueTime = float.Parse(queueTimeMatch.Groups["queueTime"].Value.Replace(",", "."), CultureInfo.InvariantCulture);
 					}
                     if (eventLine.Contains("application|TRACE-NetworkGameCreate profileStatus"))
                     {
@@ -229,10 +243,7 @@ namespace TarkovMonitor
                     {
                         // The raid start countdown begins. Only happens for PMCs.
                         raidInfo.RaidType = RaidType.PMC;
-                        if (raidInfo.Online)
-                        {
-                            RaidLoaded?.Invoke(this, new(raidInfo));
-                        }
+                        RaidCountdown?.Invoke(this, new(raidInfo));
                     }
                     if (eventLine.Contains("application|GameStarted"))
                     {
@@ -245,8 +256,9 @@ namespace TarkovMonitor
                         if (raidInfo.Online && raidInfo.RaidType != RaidType.PMC)
                         {
                             // We already raised the RaidLoaded event for PMC, so only raise here if not PMC
-                            RaidLoaded?.Invoke(this, new(raidInfo));
+                            //RaidStarted?.Invoke(this, new(raidInfo));
                         }
+                        RaidStarted?.Invoke(this, new(raidInfo));
                         raidInfo = new();
                     }
                     if (eventLine.Contains("application|Network game matching aborted") || eventLine.Contains("application|Network game matching cancelled"))
@@ -531,9 +543,9 @@ namespace TarkovMonitor
         }
         public Position(string x, string y, string z)
         {
-            X = float.Parse(x);
-            Y = float.Parse(y);
-            Z = float.Parse(z);
+            X = float.Parse(x, CultureInfo.InvariantCulture);
+            Y = float.Parse(y, CultureInfo.InvariantCulture);
+            Z = float.Parse(z, CultureInfo.InvariantCulture);
         }
     }
     public class RaidExitedEventArgs : EventArgs
@@ -588,14 +600,42 @@ namespace TarkovMonitor
         public string Nickname { get; set; }
         public GroupUserLeaveEventArgs(JsonNode node)
         {
-            Nickname = node["Nickname"].ToString();
+            // if you're the one to leave the group, Nickname is not included
+            var nickNode = node["Nickname"];
+            if (nickNode != null)
+            {
+                Nickname = node["Nickname"].ToString();
+            } else
+            {
+                Nickname = "You";
+            }
         }
     }
-	public class GroupReadyEventArgs : EventArgs
+    public class GroupRaidSettingsEventArgs : EventArgs
+    {
+        public string Map { get; set; }
+        public string RaidMode { get; set; }
+        public RaidType RaidType { get; set; } = RaidType.Unknown;
+        public GroupRaidSettingsEventArgs(JsonNode node)
+        {
+            this.Map = node["raidSettings"]["location"].GetValue<string>();
+            this.RaidMode = node["raidSettings"]["raidMode"].GetValue<string>();
+            var stringSide = node["raidSettings"]["side"].GetValue<string>();
+            if (stringSide == "Pmc")
+            {
+                this.RaidType = RaidType.PMC;
+            }
+            if (stringSide == "Savage")
+            {
+                this.RaidType = RaidType.Scav;
+            }
+        }
+    }
+	public class GroupMemberReadyEventArgs : EventArgs
 	{
 		public PlayerInfo PlayerInfo { get; set; }
 		public PlayerLoadout PlayerLoadout { get; set; }
-		public GroupReadyEventArgs(JsonNode node)
+		public GroupMemberReadyEventArgs(JsonNode node)
 		{
 			this.PlayerInfo = new PlayerInfo(node["extendedProfile"]["Info"]);
 			this.PlayerLoadout = new PlayerLoadout(node["extendedProfile"]["PlayerVisualRepresentation"]);
@@ -605,42 +645,14 @@ namespace TarkovMonitor
 			return $"{this.PlayerInfo.Nickname} ({this.PlayerLoadout.Info.Side}, {this.PlayerLoadout.Info.Level})";
 		}
 	}
-    public class MatchingStartedEventArgs : EventArgs
+    public class RaidInfoEventArgs : EventArgs
     {
-        public float MapLoadTime { get; set; }
-        public MatchingStartedEventArgs(RaidInfo raidInfo)
+        public RaidInfo RaidInfo { get; set; }
+        public RaidInfoEventArgs(RaidInfo raidInfo)
         {
-            MapLoadTime = raidInfo.MapLoadTime;
+            RaidInfo = raidInfo;
         }
     }
-    public class MatchingCancelledEventArgs : MatchingStartedEventArgs
-    {
-        public float QueueTime { get; set; }
-        public MatchingCancelledEventArgs(RaidInfo raidInfo) : base(raidInfo)
-        {
-            QueueTime = raidInfo.QueueTime;
-        }
-    }
-	public class MatchFoundEventArgs : MatchingStartedEventArgs
-    {
-		public string Map { get; set; }
-		public string RaidId { get; set; }
-		public float QueueTime { get; set; }
-        public MatchFoundEventArgs(RaidInfo raidInfo) : base(raidInfo)
-        {
-            Map = raidInfo.Map;
-            RaidId = raidInfo.RaidId;
-            QueueTime = raidInfo.QueueTime;
-        }
-    }
-	public class RaidLoadedEventArgs : MatchFoundEventArgs
-    {
-		public RaidType RaidType { get; set; }
-        public RaidLoadedEventArgs(RaidInfo raidInfo) : base(raidInfo)
-        {
-            RaidType = raidInfo.RaidType;
-        }
-	}
 	public class FleaSoldEventArgs : EventArgs
 	{
 		public string Buyer { get; set; }
