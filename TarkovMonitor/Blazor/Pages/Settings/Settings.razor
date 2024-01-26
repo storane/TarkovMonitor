@@ -4,6 +4,7 @@
 @inject GameWatcher eft
 @inject MessageLog messageLog
 @inject IDialogService DialogService
+@inject FolderPicker folderPicker
 @layout AppLayout
 @implements IDisposable
 
@@ -25,12 +26,29 @@
 
     <MudItem xs="12">
         <MudPaper Class="pa-2 ma-2 mx-4" Elevation="3">
-            <MudText Typo="Typo.h6" Class="d-flex align-center"><MudIcon Icon="@Icons.Material.Filled.PowerSettingsNew" Class="mr-2"/>Startup</MudText>
+            <MudText Typo="Typo.h6" Class="d-flex align-center"><MudIcon Icon="@Icons.Material.Filled.PowerSettingsNew" Class="mr-2" />Startup</MudText>
             <div>
                 <MudSwitch @bind-Checked="@MinimizeAtStartupSwitch" Label="Start Tarkov Monitor Minimized" Color="Color.Info" />
             </div>
         </MudPaper>
 	</MudItem>
+
+    <MudItem xs="12">
+        <MudPaper Class="pa-2 ma-2 mx-4" Elevation="3">
+            <MudText Typo="Typo.h6" Class="d-flex align-center"><MudIcon Icon="@Icons.Material.Filled.CameraAlt" Class="mr-2" />Screenshot</MudText>
+            <MudButton @onclick="TestScreenshot" Variant="Variant.Text" Color="Color.Info">Test Screenshot</MudButton>
+            <div>
+                <MudSwitch @bind-Checked="@TakeScreenshotSwitch" Label="Record screenshot of the player at the beginning of every raid" Color="Color.Info" />
+                <MudText Typo="Typo.body1" Class="d-flex align-center mt-2">Overwrite monitor index if value from Tarkov settings is incorrect.</MudText>
+                <MudNumericField @bind-Value="@ScreenshotMonitorIndex" Label="Monitor Index" Variant="Variant.Outlined" Margin="Margin.Dense"></MudNumericField>
+                <MudText Typo="Typo.body1" Class="d-flex align-center mt-2">Where the auto screenshots will be saved.</MudText>
+                <div class="d-flex gap-1 align-center">
+                    <MudTextField @bind-Value="@AutoScreenshotDirectory" Label="Save to" Variant="Variant.Outlined" Margin="Margin.Dense"></MudTextField>
+                    <MudIconButton style="height:fit-content" Icon="@Icons.Material.Filled.FolderOpen" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Medium" @onclick="OpenFolderDialog" />
+                </div>
+            </div>
+        </MudPaper>
+    </MudItem>
 
     <MudItem xs="12">
         <MudPaper Class="pa-2 ma-2 mx-4" Elevation="3">
@@ -139,7 +157,7 @@
             Properties.Settings.Default.Save();
         }
     }
-    
+
     public bool MinimizeAtStartupSwitch
     {
         get
@@ -149,6 +167,67 @@
         set
         {
             Properties.Settings.Default.minimizeAtStartup = value;
+            Properties.Settings.Default.Save();
+        }
+    }
+
+    public bool TakeScreenshotSwitch
+    {
+        get
+        {
+            return Properties.Settings.Default.takePlayerScreenshot;
+        }
+        set
+        {
+            Properties.Settings.Default.takePlayerScreenshot = value;
+            Properties.Settings.Default.Save();
+        }
+    }
+
+    public string ScreenshotMonitorIndex
+    {
+        get
+        {
+            var index = Properties.Settings.Default.monitorIndex;
+            if (index == -1) {
+                return String.Empty;
+            } else {
+                return $"{index}";
+            }
+        }
+        set
+        {
+            if (Int32.TryParse(value, out int val))
+            {
+                Properties.Settings.Default.monitorIndex = val;
+            }
+            else
+            {
+                Properties.Settings.Default.monitorIndex = -1;
+            }
+            Properties.Settings.Default.Save();
+        }
+    }
+
+    public string AutoScreenshotDirectory
+    {
+        get
+        {
+            return Properties.Settings.Default.autoScreenshotDir;
+        }
+        set
+        {
+            Properties.Settings.Default.autoScreenshotDir = value;
+            Properties.Settings.Default.Save();            
+        }
+    }
+
+    public void OpenFolderDialog()
+    {
+        var folder = folderPicker.DisplayFolderPicker();
+        if (!string.IsNullOrEmpty(folder))
+        {
+            Properties.Settings.Default.autoScreenshotDir = folder;
             Properties.Settings.Default.Save();
         }
     }
@@ -227,7 +306,22 @@
 
             }
         }
+    }
 
+    private void TestScreenshot() 
+    {
+        DialogParameters diagParameters = new DialogParameters();
+        var path = eft.TakePlayerScreenshot();
+        if (path != null)
+        {
+            diagParameters.Add("ContentText", $"Screenshot at {path}");
+            DialogService.Show<TokenTestDialog>("Screenshot Test", diagParameters, diagOptions);
+        }
+        else
+        {
+            diagParameters.Add("ContentText", "Screenshot failed.");
+            DialogService.Show<TokenTestDialog>("Screenshot Test", diagParameters, diagOptions);
+        }
     }
 
     private void OpenTrackerSettings() {

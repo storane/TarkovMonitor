@@ -38,6 +38,15 @@ namespace TarkovMonitor
             // Singleton Group tracker
             groupManager = new GroupManager();
 
+            // Singleton folder picker
+            FolderPicker folderPicker = new();
+            var screenshotPath = eft.GetScreenshotPath();
+            if (Directory.Exists(screenshotPath) && string.IsNullOrEmpty(Properties.Settings.Default.autoScreenshotDir))
+            {
+                Properties.Settings.Default.autoScreenshotDir = screenshotPath;
+                Properties.Settings.Default.Save();
+            }
+
             // Singleton tarkov.dev repository (to DI the results of the queries)
             //tarkovdevRepository = new TarkovDevRepository();
 
@@ -90,7 +99,8 @@ namespace TarkovMonitor
             services.AddSingleton<MessageLog>(messageLog);
             services.AddSingleton<LogRepository>(logRepository);
             services.AddSingleton<GroupManager>(groupManager);
-            //services.AddSingleton<TarkovDevRepository>(tarkovdevRepository);
+            services.AddSingleton<FolderPicker>(folderPicker);
+            //services.AddSingleton<TarkovDevRepository>(tarkovdevRepository);            
             blazorWebView1.HostPage = "wwwroot\\index.html";
             blazorWebView1.Services = services.BuildServiceProvider();
             blazorWebView1.RootComponents.Add<TarkovMonitor.Blazor.App>("#app");
@@ -305,6 +315,18 @@ namespace TarkovMonitor
 
         private void Eft_MatchFound(object? sender, RaidInfoEventArgs e)
         {
+            if (Properties.Settings.Default.takePlayerScreenshot)
+            {
+                var path = eft.TakePlayerScreenshot();
+                if (path != null)
+                {
+                    messageLog.AddMessage($"Screenshot saved to: {path}");
+                }
+                else
+                {
+                    messageLog.AddMessage("Failed to take screenshot");
+                }
+            }
             if (Properties.Settings.Default.matchFoundAlert)
             {
                 PlaySoundFromResource(Properties.Resources.match_found);
